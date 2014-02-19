@@ -99,6 +99,7 @@ class Docker::Image
     }
     info.merge!(self.json)
     img && info.merge!(img.info)
+    self
   end
 
   class << self
