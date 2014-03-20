@@ -1,5 +1,6 @@
 # This class represents a Docker Image.
-class Docker::Image < Docker::Base
+class Docker::Image
+  include Docker::Base
 
   # Given a command and optional list of streams to attach to, run a command on
   # an Image. This will not modify the Image, but rather create a new Container
@@ -92,17 +93,24 @@ class Docker::Image < Docker::Base
     end
   end
 
+  # Update the @info hash, which is the only mutable state in this object.
+  def refresh!
+    img = Docker::Image.all(:all => true).find { |image|
+      image.id.start_with?(self.id) || self.id.start_with?(image.id)
+    }
+    info.merge!(self.json)
+    img && info.merge!(img.info)
+    self
+  end
+
   class << self
 
     # Create a new Image.
     def create(opts = {}, creds = nil, conn = Docker.connection)
-      credentials = (creds.nil?) ? creds.to_json : Docker.creds
-      headers = if credentials.nil?
-        Docker::Util.build_auth_header(credentials)
-      else
-        {}
-      end
-      body = conn.post('/images/create', opts)
+      credentials = creds.nil? ? Docker.creds : creds.to_json
+      headers = !credentials.nil? && Docker::Util.build_auth_header(credentials)
+      headers ||= {}
+      body = conn.post('/images/create', opts, :headers => headers)
       id = Docker::Util.fix_json(body).last['id']
       new(conn, 'id' => id, :headers => headers)
     end
